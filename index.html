@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<title>Space Dash</title>
+
+<style>
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  overflow: hidden;
+  background: #050518;
+  font-family: Arial, sans-serif;
+  touch-action: manipulation;
+}
+
+canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+
+#info {
+  position: fixed;
+  top: 15px;
+  left: 15px;
+  color: white;
+  font-size: 22px;
+  font-weight: bold;
+  z-index: 2;
+  text-shadow: 0 2px 5px #000;
+}
+
+#message {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  color: white;
+  text-align: center;
+  pointer-events: none;
+}
+
+#message h1 {
+  font-size: 48px;
+  margin-bottom: 15px;
+}
+
+#message p {
+  font-size: 20px;
+}
+
+.hidden {
+  display: none !important;
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="game"></canvas>
+
+<div id="info">
+Score: <span id="score">0</span>
+</div>
+
+<div id="message">
+  <h1>🚀 SPACE DASH</h1>
+  <p>Tap the screen to fly</p>
+</div>
+
+<script>
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let W, H;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+
+resize();
+window.addEventListener("resize", resize);
+
+let player;
+let obstacles;
+let stars;
+let score;
+let gameOver;
+let started;
+
+function resetGame() {
+
+  player = {
+    x: W * 0.2,
+    y: H / 2,
+    size: 28,
+    velocity: 0
+  };
+
+  obstacles = [];
+  stars = [];
+
+  score = 0;
+  gameOver = false;
+  started = true;
+
+  document.getElementById("message").classList.add("hidden");
+
+  for (let i = 0; i < 80; i++) {
+    stars.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      size: Math.random() * 2 + 1,
+      speed: Math.random() * 2 + 1
+    });
+  }
+}
+
+function flap() {
+
+  if (!started || gameOver) {
+    resetGame();
+    return;
+  }
+
+  player.velocity = -7;
+}
+
+document.addEventListener("touchstart", function(e) {
+  e.preventDefault();
+  flap();
+}, {passive:false});
+
+document.addEventListener("mousedown", flap);
+
+function createObstacle() {
+
+  const gap = 180;
+  const topHeight = Math.random() * (H - gap - 150) + 60;
+
+  obstacles.push({
+    x: W + 50,
+    width: 65,
+    top: topHeight,
+    bottom: topHeight + gap,
+    passed: false
+  });
+}
+
+let obstacleTimer = 0;
+
+function update() {
+
+  if (!started || gameOver) return;
+
+  player.velocity += 0.35;
+  player.y += player.velocity;
+
+  obstacleTimer++;
+
+  if (obstacleTimer > 100) {
+    createObstacle();
+    obstacleTimer = 0;
+  }
+
+  for (let star of stars) {
+    star.x -= star.speed;
+
+    if (star.x < 0) {
+      star.x = W;
+      star.y = Math.random() * H;
+    }
+  }
+
+  for (let obstacle of obstacles) {
+
+    obstacle.x -= 4;
+
+    if (!obstacle.passed &&
+        obstacle.x + obstacle.width < player.x) {
+
+      obstacle.passed = true;
+      score++;
+      document.getElementById("score").textContent = score;
+    }
+
+    const hitX =
+      player.x + player.size > obstacle.x &&
+      player.x - player.size < obstacle.x + obstacle.width;
+
+    const hitY =
+      player.y - player.size < obstacle.top ||
+      player.y + player.size > obstacle.bottom;
+
+    if (hitX && hitY) {
+      endGame();
+    }
+  }
+
+  obstacles = obstacles.filter(o => o.x > -100);
+
+  if (
+    player.y - player.size < 0 ||
+    player.y + player.size > H
+  ) {
+    endGame();
+  }
+}
+
+function endGame() {
+
+  gameOver = true;
+
+  const message = document.getElementById("message");
+
+  message.classList.remove("hidden");
+
+  message.innerHTML = `
+    <h1>💥 GAME OVER</h1>
+    <p>Score: ${score}</p>
+    <p>Tap to play again</p>
+  `;
+}
+
+function drawBackground() {
+
+  ctx.fillStyle = "#050518";
+  ctx.fillRect(0, 0, W, H);
+
+  for (let star of stars) {
+
+    ctx.fillStyle = "white";
+
+    ctx.beginPath();
+    ctx.arc(
+      star.x,
+      star.y,
+      star.size,
+      0,
+      Math.PI * 2
+    );
+
+    ctx.fill();
+  }
+}
+
+function drawPlayer() {
+
+  ctx.save();
+
+  ctx.translate(player.x, player.y);
+
+  ctx.fillStyle = "#42a5ff";
+
+  ctx.beginPath();
+  ctx.moveTo(35, 0);
+  ctx.lineTo(-25, -20);
+  ctx.lineTo(-15, 0);
+  ctx.lineTo(-25, 20);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = "#ffffff";
+
+  ctx.beginPath();
+  ctx.arc(0, 0, 7, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#ff8a00";
+
+  ctx.beginPath();
+  ctx.moveTo(-20, -8);
+  ctx.lineTo(-38, 0);
+  ctx.lineTo(-20, 8);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawObstacles() {
+
+  for (let obstacle of obstacles) {
+
+    ctx.fillStyle = "#8a2be2";
+
+    ctx.fillRect(
+      obstacle.x,
+      0,
+      obstacle.width,
+      obstacle.top
+    );
+
+    ctx.fillRect(
+      obstacle.x,
+      obstacle.bottom,
+      obstacle.width,
+      H
+    );
+  }
+}
+
+function draw() {
+
+  drawBackground();
+  drawObstacles();
+
+  if (player) {
+    drawPlayer();
+  }
+}
+
+function gameLoop() {
+
+  update();
+  draw();
+
+  requestAnimationFrame(gameLoop);
+}
+
+resetGame();
+gameLoop();
+
+</script>
+
+</body>
+</html>
